@@ -54,14 +54,17 @@ async function createDefaultState(): Promise<DbState> {
     applications: [],
     emailAccounts: [],
     emailLogs: [],
-    aiInterviewSessions: []
+    aiInterviewSessions: [],
+    applicationDrafts: []
   };
 }
+
 
 
 export async function loadState(): Promise<DbState> {
   await mkdir(path.dirname(dataFile), { recursive: true });
   await mkdir(uploadsDir, { recursive: true });
+
 
   try {
     const raw = await readFile(dataFile, 'utf8');
@@ -73,7 +76,8 @@ export async function loadState(): Promise<DbState> {
       applications: parsed.applications ?? [],
       emailAccounts: parsed.emailAccounts ?? [],
       emailLogs: parsed.emailLogs ?? [],
-      aiInterviewSessions: parsed.aiInterviewSessions ?? []
+      aiInterviewSessions: parsed.aiInterviewSessions ?? [],
+      applicationDrafts: (parsed as any).applicationDrafts ?? []
     };
 
 

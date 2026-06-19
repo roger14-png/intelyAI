@@ -54,6 +54,7 @@ function splitList(value: string): string[] {
 export default function App() {
   const queryClient = useQueryClient();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authRole, setAuthRole] = useState<'candidate' | 'recruiter' | 'admin'>('candidate');
   const [tokenReady, setTokenReady] = useState(Boolean(localStorage.getItem('intelyhire-token')));
 
   const meQuery = useQuery({
@@ -165,8 +166,10 @@ export default function App() {
       <div className="auth-shell">
         <AuthHero />
         <AuthCard
+          role={authRole}
           mode={authMode}
           onModeChange={setAuthMode}
+          onRoleChange={setAuthRole}
           onSubmit={(payload) => authMutation.mutate(payload)}
           loading={authMutation.isPending}
           error={authMutation.error instanceof Error ? authMutation.error.message : null}
@@ -277,13 +280,17 @@ function AuthHero() {
 }
 
 function AuthCard({
+  role,
   mode,
   onModeChange,
+  onRoleChange,
   onSubmit,
   loading,
   error
 }: {
+  role: 'candidate' | 'recruiter' | 'admin';
   mode: 'login' | 'register';
+  onRoleChange: (role: 'candidate' | 'recruiter' | 'admin') => void;
   onModeChange: (mode: 'login' | 'register') => void;
   onSubmit: (payload: { mode: 'login' | 'register'; fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' }) => void;
   loading: boolean;
@@ -292,7 +299,7 @@ function AuthCard({
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('recruiter@intelyhire.dev');
   const [password, setPassword] = useState('Passw0rd!');
-  const [role, setRole] = useState<'candidate' | 'recruiter'>('candidate');
+  const [selectedRole, setSelectedRole] = useState<'candidate' | 'recruiter'>('candidate');
 
   return (
     <section className="auth-card">
@@ -309,7 +316,7 @@ function AuthCard({
         className="auth-form"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit({ mode, fullName, email, password, role });
+          onSubmit({ mode, fullName, email, password, role: selectedRole });
         }}
       >
         {mode === 'register' ? (
@@ -332,7 +339,7 @@ function AuthCard({
         {mode === 'register' ? (
           <label>
             Role
-            <select value={role} onChange={(event) => setRole(event.target.value as 'candidate' | 'recruiter')}>
+            <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as 'candidate' | 'recruiter')}>
               <option value="candidate">Candidate</option>
               <option value="recruiter">Recruiter</option>
             </select>
@@ -641,7 +648,7 @@ function RecruiterWorkspace({
   onToggleJob: (jobId: string, status: 'open' | 'closed') => void;
   onUpdateApplication: (applicationId: string, status: Application['status']) => void;
   pending: boolean;
-}): JSX.Element {
+}): React.ReactElement {
 
   const [jobDraft, setJobDraft] = useState({
     title: 'Frontend Engineer',
