@@ -1,0 +1,175 @@
+{
+  "users": [
+    {
+      "id": "e43af83f-db4d-4e3d-ba7d-5d6bbf0fc1ba",
+      "fullName": "Amina Recruiter",
+      "email": "recruiter@intelyhire.dev",
+      "passwordHash": "$2b$10$ReeAORuYROJlF4Y.EjLnNOr6ZjVov1FxNi9ox49lugVNf8mcVBIsu",
+      "role": "recruiter",
+      "verified": true,
+      "createdAt": "2026-06-15T07:18:02.162Z",
+      "updatedAt": "2026-06-15T07:18:02.163Z"
+    },
+    {
+      "id": "262c76ec-b372-40ec-90ca-1f0eece18c05",
+      "fullName": "Olivia Admin",
+      "email": "admin@intelyhire.dev",
+      "passwordHash": "$2b$10$H1JJmz7l/DahgVYSvI4YIud.E/rlll1Qe2i6yeaDMqgsvlXud5kqu",
+      "role": "admin",
+      "verified": true,
+      "createdAt": "2026-06-15T07:18:02.163Z",
+      "updatedAt": "2026-06-15T07:18:02.163Z"
+    },
+    {
+      "id": "7216a2ec-1539-48db-bf06-bc6487ab44ef",
+      "fullName": "Noah Founder",
+      "email": "founder@intelyhire.dev",
+      "passwordHash": "$2b$10$PMI7L/QjrKKHwQMkZ5M/eOwYSMFL4h1i0SwlMvmLRzaMnVOhAi0Ee",
+      "role": "founder",
+      "verified": true,
+      "createdAt": "2026-06-15T07:18:02.163Z",
+      "updatedAt": "2026-06-15T07:18:02.163Z"
+    },
+    {
+      "id": "788cea73-2bd2-4ea2-8462-7a8bc37078a1",
+      "fullName": "Test Candidate",
+      "email": "candidate.b2aea140@intelyhire.dev",
+      "passwordHash": "$2b$10$YyUk2KJnOKoBzkKZcXq5fewog7wY2hFOGnJlAcRj5HWDuM0w/.9G.",
+      "role": "candidate",
+      "verified": false,
+      "createdAt": "2026-06-15T07:18:25.964Z",
+      "updatedAt": "2026-06-15T07:18:25.964Z"
+    }
+  ],
+  "candidateProfiles": [
+    {
+      "userId": "788cea73-2bd2-4ea2-8462-7a8bc37078a1",
+      "headline": "",
+      "location": "",
+      "summary": "",
+      "cvUrl": "",
+      "certificates": [],
+      "skills": [],
+      "education": [],
+      "experience": []
+    }
+  ],
+  "jobs": [
+    {
+      "id": "3762e132-8b70-49cb-87fd-a6e00ac425cd",
+      "title": "Backend Engineer",
+      "company": "IntelyHire",
+      "location": "Remote",
+      "employmentType": "Full-time",
+      "description": "Build the notification pipeline.",
+      "skills": [
+        "Node.js",
+        "TypeScript"
+      ],
+      "status": "open",
+      "createdBy": "e43af83f-db4d-4e3d-ba7d-5d6bbf0fc1ba",
+      "createdAt": "2026-06-15T07:18:43.157Z",
+      "updatedAt": "2026-06-15T07:18:43.157Z"
+    },
+    {
+      "id": "4fc37dda-4c8b-4866-aa67-68a1d041ed9e",
+      "title": "Full Stack Developer",
+      "company": "IntelyHire",
+      "location": "Remote",
+      "employmentType": "Full-time",
+      "description": "Build the candidate portal, recruiter workflow, and hiring dashboard.",
+      "skills": [
+        "TypeScript",
+        "React",
+        "Node.js"
+      ],
+      "status": "open",
+      "createdBy": "system",
+      "createdAt": "2026-06-15T07:18:02.163Z",
+      "updatedAt": "2026-06-15T07:18:02.163Z"
+    }
+  ],
+  "applications": [
+    {
+      "id": "1f6d702b-f245-43ae-8cf4-755123c19ca8",
+      "jobId": "3762e132-8b70-49cb-87fd-a6e00ac425cd",
+      "candidateId": "788cea73-2bd2-4ea2-8462-7a8bc37078a1",
+      "status": "applied",
+      "coverLetter": "Excited to build it.",
+      "createdAt": "2026-06-15T07:18:43.292Z",
+      "updatedAt": "2026-06-15T07:18:43.292Z",
+      "history": [
+        {
+          "id": "535726ca-6c46-4cb7-a03a-c6309afa52e3",
+          "status": "applied",
+          "changedBy": "788cea73-2bd2-4ea2-8462-7a8bc37078a1",
+          "notes": "Candidate submitted application",
+          "createdAt": "2026-06-15T07:18:43.292Z"
+        }
+      ]
+    },
+    {
+      "id": "8d940a48-4ead-4a0b-8381-2e7dde20b446",
+      "jobId": "4fc37dda-4c8b-4866-aa67-68a1d041ed9e",
+      "candidateId": "788cea73-2bd2-4ea2-8462-7a8bc37078a1",
+      "status": "reviewing",
+      "coverLetter": "Excited to apply.",
+      "createdAt": "2026-06-15T07:18:26.001Z",
+      "updatedAt": "2026-06-15T07:18:26.195Z",
+      "history": [
+        {
+          "id": "2b0980c0-698e-4db8-b2e3-e32751412c88",
+          "status": "reviewing",
+          "changedBy": "e43af83f-db4d-4e3d-ba7d-5d6bbf0fc1ba",
+          "notes": "Looks promising",
+          "createdAt": "2026-06-15T07:18:26.195Z"
+        },
+        {
+          "id": "5b0e97a5-f059-42ec-af75-4b9a25032595",
+          "status": "applied",
+          "changedBy": "788cea73-2bd2-4ea2-8462-7a8bc37078a1",
+          "notes": "Candidate submitted application",
+          "createdAt": "2026-06-15T07:18:26.001Z"
+        }
+      ]
+    }
+  ],
+  "emailAccounts": [
+    {
+      "id": "e5902bab-eb30-40a0-a0a2-6fd3b98fb6d6",
+      "userId": "e43af83f-db4d-4e3d-ba7d-5d6bbf0fc1ba",
+      "provider": "google",
+      "emailAddress": "recruiter@intelyhire.dev",
+      "accessToken": null,
+      "refreshToken": null,
+      "createdAt": "2026-06-15T07:18:02.344Z",
+      "updatedAt": "2026-06-15T07:18:02.344Z"
+    }
+  ],
+  "emailLogs": [
+    {
+      "id": "d050263c-ad88-4e2e-b87b-e1034d9919a0",
+      "applicationId": "1f6d702b-f245-43ae-8cf4-755123c19ca8",
+      "recipientUserId": "e43af83f-db4d-4e3d-ba7d-5d6bbf0fc1ba",
+      "recipientEmail": "recruiter@intelyhire.dev",
+      "provider": "google",
+      "direction": "outbound",
+      "status": "queued",
+      "subject": "New application for Backend Engineer",
+      "body": "A new candidate applied for Backend Engineer at IntelyHire.",
+      "createdAt": "2026-06-15T07:18:43.292Z"
+    },
+    {
+      "id": "6ad4bb5f-2ad7-47e5-909d-e77b66a4c373",
+      "applicationId": "8d940a48-4ead-4a0b-8381-2e7dde20b446",
+      "recipientUserId": "788cea73-2bd2-4ea2-8462-7a8bc37078a1",
+      "recipientEmail": "candidate.b2aea140@intelyhire.dev",
+      "provider": "system",
+      "direction": "outbound",
+      "status": "queued",
+      "subject": "IntelyHire update: Full Stack Developer status is reviewing",
+      "body": "Your application for Full Stack Developer is now marked as reviewing.\n\nNotes: Looks promising",
+      "createdAt": "2026-06-15T07:18:26.195Z"
+    }
+  ]
+}
