@@ -40,7 +40,7 @@ export async function login(payload: { email: string; password: string }) {
   });
 }
 
-export async function register(payload: { fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' }) {
+export async function register(payload: { fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' | 'admin' | 'founder' }) {
   return request<{ token: string; user: User }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload)

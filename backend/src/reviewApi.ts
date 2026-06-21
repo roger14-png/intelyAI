@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import { z } from 'zod';
-import type { Application, ApplicationDraft, EmailAccount, RequestUser } from './types.js';
+import jwt from 'jsonwebtoken';
+import type { ApplicationDraft, EmailAccount, RequestUser } from './types.js';
 import type { DbState } from './types.js';
 import { createApplicationHistoryEntry, createEmptyCandidateProfile, createEmailLog, loadState, saveState } from './store.js';
 
@@ -16,7 +17,6 @@ export function registerReviewApi(app: express.Express) {
   };
 
   const jwtSecret = process.env.JWT_SECRET ?? 'intelyhire-dev-secret';
-  const jwt = require('jsonwebtoken') as typeof import('jsonwebtoken');
 
   async function authUser(req: express.Request): Promise<RequestUser | null> {
     const token = getToken(req.header('authorization'));

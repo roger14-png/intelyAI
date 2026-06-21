@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { AuthPage } from './pages/AuthPage';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   applyToJob,
@@ -54,7 +56,7 @@ function splitList(value: string): string[] {
 export default function App() {
   const queryClient = useQueryClient();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authRole, setAuthRole] = useState<'candidate' | 'recruiter' | 'admin'>('candidate');
+  const [authRole, setAuthRole] = useState<'candidate' | 'recruiter' | 'admin' | 'founder'>('candidate');
   const [tokenReady, setTokenReady] = useState(Boolean(localStorage.getItem('intelyhire-token')));
 
   const meQuery = useQuery({
@@ -77,10 +79,11 @@ export default function App() {
   const profileQuery = useQuery({ queryKey: ['profile'], queryFn: profile, enabled: Boolean(meQuery.data && meQuery.data.user.role === 'candidate') });
 
   const authMutation = useMutation({
-    mutationFn: async (payload: { mode: 'login' | 'register'; fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' }) => {
+    mutationFn: async (payload: { mode: 'login' | 'register'; fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' | 'admin' | 'founder' }) => {
+      const roleForBackend = payload.role === 'founder' ? 'admin' : payload.role;
       return payload.mode === 'login'
         ? login({ email: payload.email, password: payload.password })
-        : register({ fullName: payload.fullName, email: payload.email, password: payload.password, role: payload.role });
+        : register({ fullName: payload.fullName, email: payload.email, password: payload.password, role: roleForBackend as 'candidate' | 'recruiter' | 'admin' | 'founder' });
     },
     onSuccess: async (data) => {
       setToken(data.token);
@@ -163,20 +166,16 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className="auth-shell">
-        <AuthHero />
-        <AuthCard
-          role={authRole}
-          mode={authMode}
-          onModeChange={setAuthMode}
-          onRoleChange={setAuthRole}
-          onSubmit={(payload) => authMutation.mutate(payload)}
-          loading={authMutation.isPending}
-          error={authMutation.error instanceof Error ? authMutation.error.message : null}
-        />
-      </div>
+      <AuthPage
+        initialRole={authRole}
+        initialMode={authMode}
+        loading={authMutation.isPending}
+        error={authMutation.error instanceof Error ? authMutation.error.message : null}
+      />
     );
   }
+
+
 
   return (
     <div className="app-shell">
@@ -242,7 +241,7 @@ export default function App() {
             />
           ) : null}
 
-          {currentUser.role !== 'candidate' ? (
+          {currentUser.role === 'recruiter' ? (
             <RecruiterWorkspace
               jobs={jobsQuery.data?.jobs ?? []}
               applications={applicationsQuery.data?.applications ?? []}
@@ -288,18 +287,18 @@ function AuthCard({
   loading,
   error
 }: {
-  role: 'candidate' | 'recruiter' | 'admin';
+  role: 'candidate' | 'recruiter' | 'admin' | 'founder';
   mode: 'login' | 'register';
-  onRoleChange: (role: 'candidate' | 'recruiter' | 'admin') => void;
+  onRoleChange: (role: 'candidate' | 'recruiter' | 'admin' | 'founder') => void;
   onModeChange: (mode: 'login' | 'register') => void;
-  onSubmit: (payload: { mode: 'login' | 'register'; fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' }) => void;
+  onSubmit: (payload: { mode: 'login' | 'register'; fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' | 'admin' | 'founder' }) => void;
   loading: boolean;
   error: string | null;
 }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('recruiter@intelyhire.dev');
   const [password, setPassword] = useState('Passw0rd!');
-  const [selectedRole, setSelectedRole] = useState<'candidate' | 'recruiter'>('candidate');
+  const [selectedRole, setSelectedRole] = useState<'candidate' | 'recruiter' | 'admin' | 'founder'>('candidate');
 
   return (
     <section className="auth-card">
@@ -339,9 +338,11 @@ function AuthCard({
         {mode === 'register' ? (
           <label>
             Role
-            <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as 'candidate' | 'recruiter')}>
+            <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as 'candidate' | 'recruiter' | 'admin' | 'founder')}>
               <option value="candidate">Candidate</option>
               <option value="recruiter">Recruiter</option>
+              <option value="admin">Admin</option>
+              <option value="founder">Founder</option>
             </select>
           </label>
         ) : null}
