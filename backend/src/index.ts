@@ -388,10 +388,14 @@ app.get('/jobs', async (req, res) => {
   const state = await loadState();
   const jobs = state.jobs.map((job) => ({
     ...job,
-    applicantCount: state.applications.filter((application) => application.jobId === job.id).length
+    applicantCount: state.applications.filter((application) => application.jobId === job.id).length,
+    // Defaults for new MVP fields
+    verified: job.verified ?? false,
+    jobTrustScore: job.jobTrustScore ?? 0
   }));
   res.json({ jobs });
 });
+
 
 app.post('/jobs', async (req, res) => {
   const current = await authUser(req);
@@ -624,15 +628,113 @@ app.post('/ai/match', async (req, res) => {
   });
 });
 
-app.post('/ai/trust', async (req, res) => {
+app.post('/ai/career-intelligence', async (req, res) => {
   const current = await authUser(req);
   if (!current) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const payload = z.object({
-    jobId: z.string().optional(),
+    candidateId: z.string().optional()
+  }).safeParse(req.body);
+
+  if (!payload.success) {
+    return res.status(400).json({ error: payload.error.flatten() });
+  }
+
+  const state = await loadState();
+  const candidateId = payload.data.candidateId ?? current.id;
+  const profile = state.candidateProfiles.find((entry) => entry.userId === candidateId);
+
+  if (!profile) {
+    return res.status(404).json({ error: 'Candidate profile not found' });
+  }
+
+  // MVP heuristic mapping of inputs to the required formula buckets.
+  // We don't have explicit structured project/experience/education years, so we approximate:
+  // - Experience bucket -> number of experience entries (0..N)
+  // - Skills bucket -> number of skills (0..N)
+  // - Projects bucket -> number of experience entries with descriptions (approx projects)
+  // - Education bucket -> number of education entries
+  // - Certifications bucket -> number of certificates
+
+  const experienceCount = profile.experience.length;
+  const skillsCount = profile.skills.length;
+  const projectCountApprox = profile.experience.filter((e) => e.description?.trim().length > 0).length;
+  const educationCount = profile.education.length;
+  const certCount = profile.certificates.length;
+
+  const scale0to100 = (value: number, cap: number) => {
+    if (cap <= 0) return 0;
+    const v = Math.max(0, Math.min(cap, value));
+    return Math.round((v / cap) * 100);
+  };
+
+
+  const experienceScore = scale0to100(experienceCount, 5); // 0-5+ -> 0..100
+  const skillsScore = scale0to100(skillsCount, 20); // 0-20+ -> 0..100
+  const projectsScore = scale0to100(projectCountApprox, 5);
+  const educationScore = scale0to100(educationCount, 2);
+  const certificationsScore = scale0to100(certCount, 3);
+
+  const careerScoreRaw =
+    0.30 * experienceScore +
+    0.30 * skillsScore +
+    0.20 * projectsScore +
+    0.10 * educationScore +
+    0.10 * certificationsScore;
+
+  const careerScore = Math.max(0, Math.min(100, Math.round(careerScoreRaw)));
+
+  // Sub-scores (simple splits for MVP)
+  const technicalScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(0.60 * skillsScore + 0.25 * projectsScore + 0.15 * experienceScore)
+    )
+  );
+  const communicationScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(0.45 * (profile.summary.trim().length > 0 ? 100 : 0) + 0.35 * (profile.headline.trim().length > 0 ? 100 : 0) + 0.20 * (profile.cvUrl ? 100 : 0))
+    )
+  );
+
+  const marketReadiness = careerScore >= 81 ? 'High' : careerScore >= 61 ? 'Medium' : 'Low';
+
+  const tier = careerScore <= 40 ? 'Beginner' : careerScore <= 60 ? 'Emerging' : careerScore <= 80 ? 'Competitive' : 'Highly Employable';
+
+  res.json({
+    candidate: candidateId,
+    output: {
+      careerScore,
+      technicalScore,
+      communicationScore,
+      marketReadiness,
+      tier,
+      formula: {
+        experience: { weight: 0.30, score: experienceScore },
+        skills: { weight: 0.30, score: skillsScore },
+        projects: { weight: 0.20, score: projectsScore },
+        education: { weight: 0.10, score: educationScore },
+        certifications: { weight: 0.10, score: certificationsScore }
+      }
+    }
+  });
+});
+
+app.post('/ai/trust', async (req, res) => {
+  // Backwards-compatible alias: trust_score now equals careerScore for the MVP.
+  const current = await authUser(req);
+  if (!current) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const payload = z.object({
     candidateId: z.string().optional(),
+    jobId: z.string().optional(),
     applicationId: z.string().optional()
   }).safeParse(req.body);
 
@@ -643,48 +745,53 @@ app.post('/ai/trust', async (req, res) => {
   const state = await loadState();
   const candidateId = payload.data.candidateId ?? current.id;
   const profile = state.candidateProfiles.find((entry) => entry.userId === candidateId);
-  const job = payload.data.jobId ? state.jobs.find((entry) => entry.id === payload.data.jobId) : null;
 
   if (!profile) {
     return res.status(404).json({ error: 'Candidate profile not found' });
   }
 
-  const hasCv = Boolean(profile.cvUrl);
-  const hasHeadline = profile.headline.trim().length > 0;
-  const hasSummary = profile.summary.trim().length > 0;
-  const skillCount = profile.skills.length;
+  const experienceCount = profile.experience.length;
+  const skillsCount = profile.skills.length;
+  const projectCountApprox = profile.experience.filter((e) => e.description?.trim().length > 0).length;
+  const educationCount = profile.education.length;
   const certCount = profile.certificates.length;
 
-  const base = 35;
-  const completeness = (hasCv ? 25 : 0) + (hasHeadline ? 10 : 0) + (hasSummary ? 10 : 0);
-  const skillsComponent = Math.min(20, skillCount * 2);
-  const certsComponent = Math.min(10, certCount * 2);
+  const scale0to100 = (value: number, cap: number) => {
+    const v = Math.max(0, Math.min(cap, value));
+    return Math.round((v / cap) * 100);
+  };
 
-  let jobOverlap = 0;
-  if (job) {
-    const reqSkills = new Set(job.skills.map((s) => s.toLowerCase()));
-    const candSkills = new Set(profile.skills.map((s) => s.toLowerCase()));
-    const overlap = Array.from(reqSkills).filter((s) => candSkills.has(s)).length;
-    jobOverlap = reqSkills.size === 0 ? 0 : Math.round((overlap / reqSkills.size) * 15);
-  }
+  const experienceScore = scale0to100(experienceCount, 5);
+  const skillsScore = scale0to100(skillsCount, 20);
+  const projectsScore = scale0to100(projectCountApprox, 5);
+  const educationScore = scale0to100(educationCount, 2);
+  const certificationsScore = scale0to100(certCount, 3);
 
-  const trustScore = Math.max(0, Math.min(100, Math.round(base + completeness + skillsComponent + certsComponent + jobOverlap)));
+  const careerScoreRaw =
+    0.30 * experienceScore +
+    0.30 * skillsScore +
+    0.20 * projectsScore +
+    0.10 * educationScore +
+    0.10 * certificationsScore;
 
-  const level = trustScore >= 85 ? 'High trust' : trustScore >= 65 ? 'Medium trust' : 'Low trust';
+  const trustScore = Math.max(0, Math.min(100, Math.round(careerScoreRaw)));
+  const level = trustScore >= 81 ? 'High' : trustScore >= 61 ? 'Medium' : 'Low';
+
   const risks: string[] = [];
-  if (!hasCv) risks.push('CV missing');
-  if (!hasHeadline) risks.push('Headline missing');
-  if (!hasSummary) risks.push('Summary missing');
-  if (skillCount === 0) risks.push('No skills listed');
+  if (!profile.cvUrl) risks.push('CV missing');
+  if (!profile.headline.trim()) risks.push('Headline missing');
+  if (!profile.summary.trim()) risks.push('Summary missing');
+  if (skillsCount === 0) risks.push('No skills listed');
 
   res.json({
     candidate: candidateId,
-    job: job?.title ?? null,
+    job: null,
     trust_score: trustScore,
     level,
     risks
   });
 });
+
 
 app.post('/ai/interview/start', async (req, res) => {
   const current = await authUser(req);

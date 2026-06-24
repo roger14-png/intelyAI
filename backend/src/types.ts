@@ -40,7 +40,12 @@ export interface Job {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+
+  // Job Intelligence (MVP fields)
+  verified?: boolean;
+  jobTrustScore?: number;
 }
+
 
 export interface ApplicationHistoryEntry {
   id: string;

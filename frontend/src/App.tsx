@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AuthPage } from './pages/AuthPage';
 
+import { CareerScoreCard } from './components/career/CareerScoreCard';
+import { ApplicationStats } from './components/career/ApplicationStats';
+import { SkillGapAnalysis } from './components/career/SkillGapAnalysis';
+import { JobRecommendations } from './components/career/JobRecommendations';
+import { CareerCoachAI } from './components/career/CareerCoachAI';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   applyToJob,
@@ -375,8 +381,10 @@ function CandidateWorkspace({
   onUploadCv: (file: File) => void;
   onApply: (jobId: string) => void;
   onBusy: boolean;
-}) {
+}): React.ReactElement {
+
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+
 
   const draftsQuery = useQuery({
     queryKey: ['application-drafts'],
