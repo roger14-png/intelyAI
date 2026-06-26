@@ -125,6 +125,24 @@ export interface ApplicationDraft {
   updatedAt: string;
 }
 
+export interface AgentRunDraft {
+  draftId: string;
+  jobId: string;
+}
+
+export type AgentRunStatus = 'prepared' | 'approved' | 'rejected';
+export type AgentRunMode = 'prepare_only';
+
+export interface AgentRun {
+  id: string;
+  candidateId: string;
+  status: AgentRunStatus;
+  mode: AgentRunMode;
+  runDrafts: AgentRunDraft[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DbState {
   users: User[];
   candidateProfiles: CandidateProfile[];
@@ -134,7 +152,9 @@ export interface DbState {
   emailLogs: EmailLog[];
   aiInterviewSessions: AiInterviewSession[];
   applicationDrafts: ApplicationDraft[];
+  agentRuns?: AgentRun[];
 }
+
 
 
 export interface RequestUser {
@@ -143,3 +163,4 @@ export interface RequestUser {
   role: Role;
   fullName: string;
 }
+

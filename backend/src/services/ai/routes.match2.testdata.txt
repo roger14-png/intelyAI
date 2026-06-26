@@ -1,0 +1,6 @@
+POST /ai/match2 -> forwards to Django POST {base}/v1/match
+Body: { jobId: string, candidateId?: string }
+Response: passthrough from Django
+
+Django expects: request.data.jobId, request.data.candidateId (optional)
+

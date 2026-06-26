@@ -11,11 +11,15 @@ import type { Application, ApplicationDraft, ApplicationDraftStatus, EmailAccoun
 const app = express();
 
 import { registerReviewApi } from './reviewApi.js';
+import { registerAgentApi } from './agentApi.js';
 
 registerReviewApi(app);
-
+registerAgentApi(app);
 
 const port = Number(process.env.PORT ?? 4000);
+
+
+
 const jwtSecret = process.env.JWT_SECRET ?? 'intelyhire-dev-secret';
 const upload = multer({ dest: uploadsDir });
 

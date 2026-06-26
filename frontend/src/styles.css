@@ -1,5 +1,9 @@
 :root {
   color-scheme: dark;
+  --primary: #0077FF;
+  --accent: #28C76F;
+  --deep: #0B1F3A;
+
   font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -33,6 +37,41 @@ button, input, textarea, select {
 
 button {
   cursor: pointer;
+}
+
+.landing-logo__img,
+.legal-logo-badge__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.landing-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.66);
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  overflow: hidden;
+}
+
+.landing-logo__img {
+  padding: 8px;
+}
+
+.legal-logo-badge {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.legal-logo-badge__img {
+  padding: 10px;
 }
 
 .auth-shell,
@@ -348,6 +387,246 @@ select:focus {
 
   .sidebar {
     position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .landing-nav {
+    padding: 14px 0;
+  }
+}
+
+/* ------------------------------ */
+/* Landing page (public) fixes */
+/* ------------------------------ */
+
+.landing {
+  min-height: 100vh;
+}
+
+.landing-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 50;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 27, 51, 0.75);
+  backdrop-filter: blur(14px);
+}
+
+.landing-nav > .container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.landing-nav {
+  padding: 22px 0;
+}
+
+/* Desktop layout */
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-nav__left,
+.landing-nav__right {
+  display: flex;
+  align-items: center;
+}
+
+.landing-nav__left {
+  gap: 12px;
+}
+
+/* Make brand not wrap and keep brand on one line */
+.brand-name {
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.landing-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+}
+
+.landing-logo__img {
+  padding: 8px;
+}
+
+.landing-nav__right {
+  gap: 18px;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: rgba(236, 242, 255, 0.92);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.nav-link:hover {
+  color: #ffffff;
+}
+
+.nav-link--cta {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #38bdf8, #86efac);
+  color: #07111f;
+}
+
+/* Ensure main content isn't hidden under fixed nav */
+.landing-hero {
+  padding-top: 120px;
+}
+
+/* Hero: two columns on desktop */
+.landing-hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 1.05fr);
+  gap: 72px;
+  align-items: center;
+}
+
+.landing-hero__copy {
+  max-width: 540px;
+}
+
+.landing-h1 {
+  font-size: clamp(2.5rem, 3.5vw, 4.5rem);
+  line-height: 1.06;
+  font-weight: 900;
+  margin: 0;
+}
+
+.landing-sub {
+  font-size: 18px;
+  color: rgba(167, 181, 202, 1);
+}
+
+.landing-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.metric {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.5);
+  color: #ecf2ff;
+  font-weight: 700;
+}
+
+/* Dashboard card: float + glass */
+.dashboard-mockup {
+  position: relative;
+  border-radius: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+  padding: 22px;
+}
+
+.landing-hero {
+  background:
+    radial-gradient(circle at top right, rgba(0, 119, 255, 0.2), transparent 40%),
+    radial-gradient(circle at bottom left, rgba(40, 199, 111, 0.15), transparent 40%),
+    #081B33;
+}
+
+.landing-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  padding: 0 28px;
+  border-radius: 999px;
+  font-weight: 900;
+  text-decoration: none;
+  background: linear-gradient(90deg, #3b82f6, #22c55e);
+  color: #07111f;
+}
+
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  padding: 0 28px;
+  border-radius: 999px;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(148, 163, 184, 0.08);
+  color: #ecf2ff;
+}
+
+.dashboard-mockup__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.dashboard-card {
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px;
+}
+
+.dashboard-card__label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(125, 211, 252, 0.95);
+}
+
+.dashboard-card__value {
+  font-size: 42px;
+  font-weight: 900;
+  margin-top: 8px;
+}
+
+.dashboard-card__value--small {
+  font-size: 14px;
+  font-weight: 800;
+  color: rgba(236, 242, 255, 0.95);
+}
+
+.dashboard-card__sub {
+  margin-top: 10px;
+  color: rgba(167, 181, 202, 1);
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .landing-hero__grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .landing-metrics {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-mockup__grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -36,11 +36,30 @@ import {
   applications,
   uploadCv
 } from './api';
-import type { Application, ApplicationDraft, CandidateProfile, Job } from './types';
+import type { Application, CandidateProfile, Job } from './types';
 
+import PrivacyPage from './pages/legal/PrivacyPage';
+import TermsPage from './pages/legal/TermsPage';
+import CookiesPage from './pages/legal/CookiesPage';
+import ConsentPage from './pages/legal/ConsentPage';
+
+import PrivacyCenterPage from './pages/settings/PrivacyCenterPage';
+import ConsentsPage from './pages/settings/ConsentsPage';
+import CookiePreferencesPage from './pages/settings/CookiePreferencesPage';
+
+import { PublicRoute } from './pages/PublicRoute';
+
+const legalPathnames = new Set([
+  '/legal/privacy',
+  '/legal/terms',
+  '/legal/cookies',
+  '/legal/consent',
+  '/settings/privacy-center',
+  '/settings/consents',
+  '/settings/cookie-preferences'
+]);
 
 const emptyProfile: CandidateProfile = {
-
   userId: '',
   headline: '',
   location: '',
@@ -61,9 +80,39 @@ function splitList(value: string): string[] {
 
 export default function App() {
   const queryClient = useQueryClient();
+
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+
+  // Public landing page (no auth required)
+  if (pathname === '/') {
+    if (!localStorage.getItem('intelyhire-token')) {
+      return <PublicRoute />;
+    }
+  }
+
+  // Public legal/settings routes (no auth required)
+  if (legalPathnames.has(pathname)) {
+    switch (pathname) {
+      case '/legal/privacy':
+        return <PrivacyPage />;
+      case '/legal/terms':
+        return <TermsPage />;
+      case '/legal/cookies':
+        return <CookiesPage />;
+      case '/legal/consent':
+        return <ConsentPage />;
+      case '/settings/privacy-center':
+        return <PrivacyCenterPage />;
+      case '/settings/consents':
+        return <ConsentsPage />;
+      case '/settings/cookie-preferences':
+        return <CookiePreferencesPage />;
+    }
+  }
+
+  const [tokenReady, setTokenReady] = useState(Boolean(localStorage.getItem('intelyhire-token')));
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authRole, setAuthRole] = useState<'candidate' | 'recruiter' | 'admin' | 'founder'>('candidate');
-  const [tokenReady, setTokenReady] = useState(Boolean(localStorage.getItem('intelyhire-token')));
 
   const meQuery = useQuery({
     queryKey: ['me'],
@@ -82,14 +131,29 @@ export default function App() {
   const summaryQuery = useQuery({ queryKey: ['summary'], queryFn: summary, enabled: Boolean(meQuery.data) });
   const jobsQuery = useQuery({ queryKey: ['jobs'], queryFn: jobs, enabled: Boolean(meQuery.data) });
   const applicationsQuery = useQuery({ queryKey: ['applications'], queryFn: applications, enabled: Boolean(meQuery.data) });
-  const profileQuery = useQuery({ queryKey: ['profile'], queryFn: profile, enabled: Boolean(meQuery.data && meQuery.data.user.role === 'candidate') });
+  const profileQuery = useQuery({
+    queryKey: ['profile'],
+    queryFn: profile,
+    enabled: Boolean(meQuery.data && meQuery.data.user.role === 'candidate')
+  });
 
   const authMutation = useMutation({
-    mutationFn: async (payload: { mode: 'login' | 'register'; fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' | 'admin' | 'founder' }) => {
+    mutationFn: async (payload: {
+      mode: 'login' | 'register';
+      fullName: string;
+      email: string;
+      password: string;
+      role: 'candidate' | 'recruiter' | 'admin' | 'founder';
+    }) => {
       const roleForBackend = payload.role === 'founder' ? 'admin' : payload.role;
       return payload.mode === 'login'
         ? login({ email: payload.email, password: payload.password })
-        : register({ fullName: payload.fullName, email: payload.email, password: payload.password, role: roleForBackend as 'candidate' | 'recruiter' | 'admin' | 'founder' });
+        : register({
+            fullName: payload.fullName,
+            email: payload.email,
+            password: payload.password,
+            role: roleForBackend as 'candidate' | 'recruiter' | 'admin' | 'founder'
+          });
     },
     onSuccess: async (data) => {
       setToken(data.token);
@@ -123,20 +187,15 @@ export default function App() {
   const jobMutation = useMutation({
     mutationFn: createJob,
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['jobs'] }),
-        queryClient.invalidateQueries({ queryKey: ['summary'] })
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['jobs'] }), queryClient.invalidateQueries({ queryKey: ['summary'] })]);
     }
   });
 
   const applicationStatusMutation = useMutation({
-    mutationFn: ({ applicationId, status }: { applicationId: string; status: Application['status'] }) => updateApplicationStatus(applicationId, status),
+    mutationFn: ({ applicationId, status }: { applicationId: string; status: Application['status'] }) =>
+      updateApplicationStatus(applicationId, status),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['applications'] }),
-        queryClient.invalidateQueries({ queryKey: ['summary'] })
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['applications'] }), queryClient.invalidateQueries({ queryKey: ['summary'] })]);
     }
   });
 
@@ -150,10 +209,7 @@ export default function App() {
   const applyMutation = useMutation({
     mutationFn: ({ jobId }: { jobId: string }) => applyToJob(jobId),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['applications'] }),
-        queryClient.invalidateQueries({ queryKey: ['summary'] })
-      ]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['applications'] }), queryClient.invalidateQueries({ queryKey: ['summary'] })]);
     }
   });
 
@@ -166,9 +222,7 @@ export default function App() {
         ? 'Recruiter Portal'
         : 'Admin Portal';
 
-  if (meQuery.isLoading && tokenReady) {
-    return <LoadingState />;
-  }
+  if (meQuery.isLoading && tokenReady) return <LoadingState />;
 
   if (!currentUser) {
     return (
@@ -180,8 +234,6 @@ export default function App() {
       />
     );
   }
-
-
 
   return (
     <div className="app-shell">
@@ -284,83 +336,9 @@ function AuthHero() {
   );
 }
 
-function AuthCard({
-  role,
-  mode,
-  onModeChange,
-  onRoleChange,
-  onSubmit,
-  loading,
-  error
-}: {
-  role: 'candidate' | 'recruiter' | 'admin' | 'founder';
-  mode: 'login' | 'register';
-  onRoleChange: (role: 'candidate' | 'recruiter' | 'admin' | 'founder') => void;
-  onModeChange: (mode: 'login' | 'register') => void;
-  onSubmit: (payload: { mode: 'login' | 'register'; fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' | 'admin' | 'founder' }) => void;
-  loading: boolean;
-  error: string | null;
-}) {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('recruiter@intelyhire.dev');
-  const [password, setPassword] = useState('Passw0rd!');
-  const [selectedRole, setSelectedRole] = useState<'candidate' | 'recruiter' | 'admin' | 'founder'>('candidate');
-
-  return (
-    <section className="auth-card">
-      <div className="auth-tabs">
-        <button className={mode === 'login' ? 'tab active' : 'tab'} onClick={() => onModeChange('login')} type="button">
-          Login
-        </button>
-        <button className={mode === 'register' ? 'tab active' : 'tab'} onClick={() => onModeChange('register')} type="button">
-          Register
-        </button>
-      </div>
-
-      <form
-        className="auth-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit({ mode, fullName, email, password, role: selectedRole });
-        }}
-      >
-        {mode === 'register' ? (
-          <label>
-            Full name
-            <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Taylor Candidate" />
-          </label>
-        ) : null}
-
-        <label>
-          Email
-          <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" />
-        </label>
-
-        <label>
-          Password
-          <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="••••••••" />
-        </label>
-
-        {mode === 'register' ? (
-          <label>
-            Role
-            <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as 'candidate' | 'recruiter' | 'admin' | 'founder')}>
-              <option value="candidate">Candidate</option>
-              <option value="recruiter">Recruiter</option>
-              <option value="admin">Admin</option>
-              <option value="founder">Founder</option>
-            </select>
-          </label>
-        ) : null}
-
-        {error ? <div className="error-banner">{error}</div> : null}
-        <button className="primary-button" type="submit" disabled={loading}>
-          {loading ? 'Working...' : mode === 'login' ? 'Sign in' : 'Create account'}
-        </button>
-        <p className="microcopy">Seeded recruiter, admin, and founder accounts all use the same password for fast demo access.</p>
-      </form>
-    </section>
-  );
+function AuthCard() {
+  // Kept for compatibility with previous file structure; AuthPage is now used.
+  return null;
 }
 
 function CandidateWorkspace({
@@ -382,9 +360,7 @@ function CandidateWorkspace({
   onApply: (jobId: string) => void;
   onBusy: boolean;
 }): React.ReactElement {
-
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
-
 
   const draftsQuery = useQuery({
     queryKey: ['application-drafts'],
@@ -403,8 +379,13 @@ function CandidateWorkspace({
   });
 
   const updateDraftMutation = useMutation({
-    mutationFn: ({ draftId, payload }: { draftId: string; payload: { emailSubject?: string; emailBody?: string; coverLetterText?: string } }) =>
-      updateApplicationPackageDraft(draftId, payload),
+    mutationFn: ({
+      draftId,
+      payload
+    }: {
+      draftId: string;
+      payload: { emailSubject?: string; emailBody?: string; coverLetterText?: string };
+    }) => updateApplicationPackageDraft(draftId, payload),
     onSuccess: async () => {
       await draftsQuery.refetch();
     }
@@ -412,9 +393,6 @@ function CandidateWorkspace({
 
   const approveMutation = useMutation({
     mutationFn: ({ draftId }: { draftId: string }) => approveApplicationPackageDraft(draftId),
-    onSuccess: async () => {
-      await draftsQuery.refetch();
-    }
   });
 
   const rejectMutation = useMutation({
@@ -423,6 +401,7 @@ function CandidateWorkspace({
       await draftsQuery.refetch();
     }
   });
+
   const [draft, setDraft] = useState(profile);
   const appliedJobIds = new Set(applications.map((application) => application.jobId));
 
@@ -445,7 +424,6 @@ function CandidateWorkspace({
             .filter((job) => job.status === 'open')
             .map((job) => {
               const alreadyApplied = appliedJobIds.has(job.id);
-              const isDraftSelected = selectedDraft && selectedDraft.jobId === job.id;
 
               return (
                 <article className="list-card" key={job.id}>
@@ -470,10 +448,7 @@ function CandidateWorkspace({
                       disabled={alreadyApplied || onBusy || draftsQuery.isFetching}
                       onClick={async () => {
                         setSelectedDraftId(null);
-                        const result = await generateMutation.mutateAsync({ jobId: job.id });
-                        if (result && 'draft' in result) {
-                          // backend may return draft in different shapes; keep conservative.
-                        }
+                        await generateMutation.mutateAsync({ jobId: job.id });
                         await draftsQuery.refetch();
                         const refreshedDrafts = draftsQuery.data?.drafts ?? [];
                         const draftForJob = refreshedDrafts.find((d) => d.jobId === job.id);
@@ -658,7 +633,6 @@ function RecruiterWorkspace({
   onUpdateApplication: (applicationId: string, status: Application['status']) => void;
   pending: boolean;
 }): React.ReactElement {
-
   const [jobDraft, setJobDraft] = useState({
     title: 'Frontend Engineer',
     company: 'IntelyHire',
@@ -742,15 +716,14 @@ function RecruiterWorkspace({
                   {application.candidate?.fullName ?? 'Candidate'} · {application.candidate?.email ?? 'n/a'}
                 </p>
                 <p>{application.coverLetter || 'No cover letter provided.'}</p>
-                <div className="pill-row">
-                  <button className="secondary-button" onClick={async () => alert(JSON.stringify(await matchScore(application.jobId), null, 2))} type="button">
-                    AI match
-                  </button>
-                </div>
               </div>
               <div className="inline-actions">
                 <span className={`status ${application.status}`}>{application.status}</span>
-                <select value={application.status} onChange={(event) => onUpdateApplication(application.id, event.target.value as Application['status'])} disabled={pending}>
+                <select
+                  value={application.status}
+                  onChange={(event) => onUpdateApplication(application.id, event.target.value as Application['status'])}
+                  disabled={pending}
+                >
                   <option value="applied">Applied</option>
                   <option value="reviewing">Reviewing</option>
                   <option value="shortlisted">Shortlisted</option>
@@ -804,3 +777,6 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
     </label>
   );
 }
+
+
+

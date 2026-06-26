@@ -23,6 +23,71 @@ function authUser(req: express.Request, jwtSecret: string): RequestUser | null {
 }
 
 export function registerAiRoutes(app: express.Express, options: { jwtSecret: string }) {
+  app.post('/ai/match2', async (req, res) => {
+    const current = authUser(req, options.jwtSecret);
+    if (!current) return res.status(401).json({ error: 'Unauthorized' });
+
+    const payload = z
+      .object({
+        jobId: z.string(),
+        candidateId: z.string().optional()
+      })
+      .safeParse({
+        jobId: typeof req.query.jobId === 'string' ? req.query.jobId : req.body?.jobId,
+        candidateId: req.body?.candidateId
+      });
+
+    if (!payload.success) return res.status(400).json({ error: payload.error.flatten() });
+
+    const engineUrlBase = process.env.INTELYHIRE_ENGINE_URL ?? 'http://localhost:8000';
+    const url = `${engineUrlBase.replace(/\/$/, '')}/v1/match`;
+
+    const upstreamBody = {
+      candidateId: payload.data.candidateId ?? current.id,
+      jobId: payload.data.jobId
+    };
+
+    const timeoutMs = Number(process.env.INTELYHIRE_ENGINE_TIMEOUT_MS ?? 10_000);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const upstreamRes = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          // Allow engine to inspect auth if it later supports it
+          authorization: typeof req.header('authorization') === 'string' ? req.header('authorization')! : ''
+        },
+        body: JSON.stringify(upstreamBody),
+        signal: controller.signal
+      });
+
+
+      const text = await upstreamRes.text();
+
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = { raw: text };
+      }
+
+      if (!upstreamRes.ok) {
+        return res.status(502).json({ error: 'IntelyHire engine error', status: upstreamRes.status, data });
+      }
+
+      // Pass-through (with slight normalization of ok/engine/match)
+      return res.status(200).json(data);
+    } catch (e: any) {
+      // timeout becomes an AbortError in most Node versions
+      return res.status(504).json({ error: 'IntelyHire engine timeout/unreachable', details: e?.message ?? String(e) });
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+
   app.post('/ai/match', async (req, res) => {
     const current = authUser(req, options.jwtSecret);
     if (!current) return res.status(401).json({ error: 'Unauthorized' });
