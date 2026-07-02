@@ -1,23 +1,15 @@
-# TODO.md
+## AI Job Intelligence + Git Workflow hardening
 
-## AI Career Agent feature (bot UX with user authorization)
+- [ ] Implement Job Intelligence Layer (stop relying on direct Google scraping): add compliant ingestion adapters, normalization, validation, dedup, trust-scoring hooks.
+- [ ] Replace/contain Google Jobs usage (remove from main path; ensure providers are pluggable).
+- [ ] Add queue-based ingestion scheduler (BullMQ/Redis in prod-ready design; local in-memory fallback for MVP).
+- [ ] Add caching + dedup fingerprinting for job ingestion.
+- [ ] Update backend routes/types to reflect Job Intelligence fields (verified, trustScore) and persist them.
+- [ ] Fix / prevent bot workflow from calling /ai/auto-apply/run by default.
 
-- [ ] Create an Agent Run model in backend types + MVP persistence behavior.
-- [ ] Add backend routes:
-  - [ ] POST /agent/run (prepare-only draft generation; no submission)
-  - [ ] GET /agent/runs (candidate sees their runs)
-  - [ ] POST /agent/run/:runId/approve (bulk approve -> queues emails + creates/updates applications)
-  - [ ] POST /agent/run/:runId/reject (marks drafts rejected; no submission)
-- [ ] Reuse existing draft generation + approve logic from backend/src/reviewApi.ts.
-- [ ] Add frontend UI:
-  - [ ] “AI Career Agent” section with Run / Review runs
-  - [ ] Draft list for a run with match/trust + editable email/cover letter fields
-  - [ ] Buttons: Approve & Send (per draft) + Approve All (still gated)
-  - [ ] Reject per draft and/or per run
-- [ ] Add ethical label in UI: “AI-prepared (not submitted until you approve)”.
-- [ ] Ensure bot workflow never calls /ai/auto-apply/run by default.
-- [ ] Test manually:
-  - [ ] Run agent generates drafts
-  - [ ] Approving a draft creates Application + queues EmailLog
-  - [ ] Rejecting prevents submission
+## PR-based Git workflow
+
+- [ ] Create feature branch for each logical change.
+- [ ] Ensure all changes go via Pull Requests with review gates.
+- [ ] (Repo config) Add required status checks / branch protection (if GitHub).
 

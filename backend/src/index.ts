@@ -915,9 +915,22 @@ app.post('/ai/auto-apply/run', async (req, res) => {
     return res.status(403).json({ error: 'Only candidates can auto-apply' });
   }
 
-  const payload = z.object({ jobIds: z.array(z.string()).optional(), limit: z.number().int().min(1).max(50).optional() }).safeParse(req.body);
+  // Bot/workflow hardening: require explicit user opt-in.
+  // Prevents accidental calls from background scripts/agents.
+  const payload = z
+    .object({
+      confirm: z.literal(true).optional(),
+      jobIds: z.array(z.string()).optional(),
+      limit: z.number().int().min(1).max(50).optional()
+    })
+    .safeParse(req.body);
+
   if (!payload.success) {
-    return res.status(400).json({ error: payload.error.flatten() });
+    return res.status(400).json({ error: payload.error.flatten(), hint: 'Missing confirm: true' });
+  }
+
+  if (payload.data.confirm !== true) {
+    return res.status(400).json({ error: { confirm: 'Missing confirm: true' }, hint: 'Missing confirm: true' });
   }
 
   const state = await loadState();

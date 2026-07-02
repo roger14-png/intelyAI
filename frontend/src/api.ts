@@ -157,7 +157,7 @@ export async function answerInterview(payload: { sessionId: string; questionId: 
 export async function autoApply(payload?: { jobIds?: string[]; limit?: number }) {
   return request<{ appliedCount: number; appliedApplications: any[] }>('/ai/auto-apply/run', {
     method: 'POST',
-    body: JSON.stringify(payload ?? {})
+    body: JSON.stringify({ ...(payload ?? {}), confirm: true })
   });
 }
 
