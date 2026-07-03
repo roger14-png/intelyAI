@@ -1,4 +1,4 @@
-import type { Application, ApplicationDraft, CandidateProfile, Job, Summary, User } from './types';
+import type { Application, ApplicationDraft, CandidateProfile, Job, Summary, SubscriptionPlan, User } from './types';
 
 const baseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 const tokenKey = 'intelyhire-token';
@@ -40,7 +40,7 @@ export async function login(payload: { email: string; password: string }) {
   });
 }
 
-export async function register(payload: { fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' | 'admin' | 'founder' }) {
+export async function register(payload: { fullName: string; email: string; password: string; role: 'candidate' | 'recruiter' | 'admin' | 'founder'; plan?: SubscriptionPlan }) {
   return request<{ token: string; user: User }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload)
@@ -88,7 +88,7 @@ export async function jobs() {
   return request<{ jobs: Job[] }>('/jobs');
 }
 
-export async function createJob(payload: Pick<Job, 'title' | 'company' | 'location' | 'employmentType' | 'description' | 'skills'>) {
+export async function createJob(payload: Pick<Job, 'title' | 'company' | 'location' | 'employmentType' | 'description' | 'skills' | 'qualifications' | 'merits'>) {
   return request<{ job: Job }>('/jobs', {
     method: 'POST',
     body: JSON.stringify(payload)

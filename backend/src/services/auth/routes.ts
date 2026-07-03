@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 
 import { createEmptyCandidateProfile, loadState, saveState } from '../../store.js';
-import type { Role, RequestUser, User } from '../../types.js';
+import type { Role, RequestUser, SubscriptionPlan, User } from '../../types.js';
 
 export function registerAuthRoutes(app: express.Express) {
   const jwtSecret = process.env.JWT_SECRET ?? 'intelyhire-dev-secret';
@@ -14,19 +14,21 @@ export function registerAuthRoutes(app: express.Express) {
     fullName: z.string().min(2).optional(),
     email: z.string().email(),
     password: z.string().min(6),
-    role: z.enum(['candidate', 'recruiter']).optional()
+    role: z.enum(['candidate', 'recruiter', 'admin', 'founder']).optional(),
+    plan: z.enum(['student', 'standard', 'active', 'professional']).optional()
   });
 
   function signToken(user: RequestUser): string {
     return jwt.sign(user, jwtSecret, { expiresIn: '12h' });
   }
 
-  function toPublicUser(user: { id: string; email: string; role: Role; fullName: string; verified: boolean }) {
+  function toPublicUser(user: { id: string; email: string; role: Role; fullName: string; subscriptionPlan?: SubscriptionPlan; verified: boolean }) {
     return {
       id: user.id,
       email: user.email,
       role: user.role,
       fullName: user.fullName,
+      subscriptionPlan: user.subscriptionPlan,
       verified: user.verified
     };
   }
@@ -49,6 +51,7 @@ export function registerAuthRoutes(app: express.Express) {
       email: parsed.data.email.toLowerCase(),
       passwordHash: await bcrypt.hash(parsed.data.password, 10),
       role: parsed.data.role ?? 'candidate',
+      subscriptionPlan: parsed.data.plan ?? 'student',
       verified: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -58,7 +61,7 @@ export function registerAuthRoutes(app: express.Express) {
     state.candidateProfiles.push(createEmptyCandidateProfile(user.id));
     await saveState(state);
 
-    const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName });
+    const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName, subscriptionPlan: user.subscriptionPlan });
     return res.status(201).json({ token, user: toPublicUser(user) });
   });
 
@@ -79,7 +82,7 @@ export function registerAuthRoutes(app: express.Express) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName });
+    const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName, subscriptionPlan: user.subscriptionPlan });
     return res.json({ token, user: toPublicUser(user) });
   });
 

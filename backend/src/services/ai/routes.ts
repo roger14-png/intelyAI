@@ -108,13 +108,27 @@ export function registerAiRoutes(app: express.Express, options: { jwtSecret: str
     const profile = state.candidateProfiles.find((entry) => entry.userId === candidateId);
     if (!job || !profile) return res.status(404).json({ error: 'Matching inputs not found' });
 
-    const profileText = `${profile.headline} ${profile.summary} ${profile.skills.join(' ')}`.toLowerCase();
-    const jobText = `${job.title} ${job.description} ${job.company} ${job.skills.join(' ')}`.toLowerCase();
+    const normalizeChunk = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const hasRequirementMatch = (text: string, requirement: string) => {
+      const normalizedRequirement = normalizeChunk(requirement);
+      if (!normalizedRequirement) return false;
+      const normalizedText = normalizeChunk(text);
+      return normalizedText.includes(normalizedRequirement);
+    };
+
+    const profileText = `${profile.headline} ${profile.summary} ${profile.skills.join(' ')} ${profile.experience.map((entry) => `${entry.title} ${entry.description}`).join(' ')}`.toLowerCase();
+    const jobText = `${job.title} ${job.description} ${job.company} ${job.skills.join(' ')} ${(job.qualifications ?? []).join(' ')} ${(job.merits ?? []).join(' ')}`.toLowerCase();
 
     const skills = new Set(profile.skills.map((skill) => skill.toLowerCase()));
     const requiredSkills = job.skills.map((skill) => skill.toLowerCase());
     const matchingSkills = requiredSkills.filter((skill) => skills.has(skill));
     const missingSkills = requiredSkills.filter((skill) => !skills.has(skill));
+    const qualifications = (job.qualifications ?? []).map((item) => item.trim()).filter(Boolean);
+    const merits = (job.merits ?? []).map((item) => item.trim()).filter(Boolean);
+    const matchedQualifications = qualifications.filter((item) => hasRequirementMatch(profileText, item));
+    const matchedMerits = merits.filter((item) => hasRequirementMatch(profileText, item));
+    const missingQualifications = qualifications.filter((item) => !matchedQualifications.includes(item));
+    const missingMerits = merits.filter((item) => !matchedMerits.includes(item));
 
     const jobKeywords = Array.from(new Set(jobText.split(/[^a-z0-9+.-]+/g).filter((t) => t.length >= 3)));
     const keywordHits = jobKeywords.filter((k) => profileText.includes(k));
@@ -122,17 +136,27 @@ export function registerAiRoutes(app: express.Express, options: { jwtSecret: str
     const locationHit = profile.location.trim() && job.location.trim() ? profile.location.trim().toLowerCase() === job.location.trim().toLowerCase() : false;
 
     const skillComponent = requiredSkills.length === 0 ? 0 : matchingSkills.length / requiredSkills.length;
+    const qualificationComponent = qualifications.length === 0 ? 0 : matchedQualifications.length / qualifications.length;
+    const meritComponent = merits.length === 0 ? 0 : matchedMerits.length / merits.length;
     const keywordComponent = jobKeywords.length === 0 ? 0 : keywordHits.length / jobKeywords.length;
 
-    const scoreRaw = 100 * (0.65 * skillComponent + 0.30 * keywordComponent + 0.05 * (locationHit ? 1 : 0));
+    const scoreRaw = 100 * (0.50 * skillComponent + 0.20 * qualificationComponent + 0.15 * meritComponent + 0.10 * keywordComponent + 0.05 * (locationHit ? 1 : 0));
     const score = Math.max(0, Math.min(100, Math.round(scoreRaw)));
 
     const reasons: string[] = [];
     if (requiredSkills.length > 0) {
       reasons.push(`${matchingSkills.length}/${requiredSkills.length} skills match`);
-      if (missingSkills.length > 0) reasons.push(`Missing: ${missingSkills.slice(0, 5).join(', ')}`);
+      if (missingSkills.length > 0) reasons.push(`Missing skills: ${missingSkills.slice(0, 5).join(', ')}`);
     } else {
       reasons.push('No required skills listed for this job');
+    }
+    if (qualifications.length > 0) {
+      reasons.push(`${matchedQualifications.length}/${qualifications.length} qualifications match`);
+      if (missingQualifications.length > 0) reasons.push(`Missing qualifications: ${missingQualifications.slice(0, 3).join(', ')}`);
+    }
+    if (merits.length > 0) {
+      reasons.push(`${matchedMerits.length}/${merits.length} merits align`);
+      if (missingMerits.length > 0) reasons.push(`Missing merits: ${missingMerits.slice(0, 3).join(', ')}`);
     }
     reasons.push(`${keywordHits.length} keyword hits from profile`);
     if (locationHit) reasons.push('Location matches');

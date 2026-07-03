@@ -1,4 +1,5 @@
 export type Role = 'candidate' | 'recruiter' | 'admin' | 'founder';
+export type SubscriptionPlan = 'student' | 'standard' | 'active' | 'professional';
 export type ApplicationStatus = 'applied' | 'reviewing' | 'shortlisted' | 'interview' | 'offer' | 'hired' | 'rejected';
 export type JobStatus = 'open' | 'closed';
 
@@ -7,6 +8,7 @@ export interface User {
   fullName: string;
   email: string;
   role: Role;
+  subscriptionPlan?: SubscriptionPlan;
   verified: boolean;
 }
 
@@ -30,6 +32,8 @@ export interface Job {
   employmentType: string;
   description: string;
   skills: string[];
+  qualifications?: string[];
+  merits?: string[];
   status: JobStatus;
   createdBy: string;
   createdAt: string;

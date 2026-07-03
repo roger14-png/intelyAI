@@ -78,6 +78,15 @@ function splitList(value: string): string[] {
     .filter(Boolean);
 }
 
+function getInitials(value: string): string {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'C';
+}
+
 export default function App() {
   const queryClient = useQueryClient();
 
@@ -144,6 +153,7 @@ export default function App() {
       email: string;
       password: string;
       role: 'candidate' | 'recruiter' | 'admin' | 'founder';
+      plan?: 'student' | 'standard' | 'active' | 'professional';
     }) => {
       const roleForBackend = payload.role === 'founder' ? 'admin' : payload.role;
       return payload.mode === 'login'
@@ -152,7 +162,8 @@ export default function App() {
             fullName: payload.fullName,
             email: payload.email,
             password: payload.password,
-            role: roleForBackend as 'candidate' | 'recruiter' | 'admin' | 'founder'
+            role: roleForBackend as 'candidate' | 'recruiter' | 'admin' | 'founder',
+            plan: payload.plan
           });
     },
     onSuccess: async (data) => {
@@ -165,6 +176,9 @@ export default function App() {
         queryClient.invalidateQueries({ queryKey: ['applications'] }),
         queryClient.invalidateQueries({ queryKey: ['profile'] })
       ]);
+      if (typeof window !== 'undefined') {
+        window.location.pathname = '/';
+      }
     }
   });
 
@@ -231,6 +245,7 @@ export default function App() {
         initialMode={authMode}
         loading={authMutation.isPending}
         error={authMutation.error instanceof Error ? authMutation.error.message : null}
+        onSubmit={(payload) => authMutation.mutate(payload)}
       />
     );
   }
@@ -243,6 +258,9 @@ export default function App() {
           <h1>{roleTitle}</h1>
           <p className="muted">
             {currentUser.fullName} · {currentUser.email}
+          </p>
+          <p className="muted">
+            Plan: <strong>{currentUser.subscriptionPlan ? currentUser.subscriptionPlan.charAt(0).toUpperCase() + currentUser.subscriptionPlan.slice(1) : 'Student'}</strong>
           </p>
         </div>
 
@@ -603,13 +621,31 @@ function CandidateWorkspace({
         </div>
         <div className="stack">
           {applications.map((application) => (
-            <article className="list-card" key={application.id}>
-              <div>
-                <h4>{application.job?.title ?? 'Unknown job'}</h4>
-                <p className="muted">{application.job?.company ?? 'IntelyHire'}</p>
-                <p>{application.coverLetter || 'No cover letter yet.'}</p>
+            <article className="profile-card" key={application.id}>
+              <div className="profile-card__header">
+                <div className="profile-card__avatar">{getInitials(application.job?.title ?? 'Candidate')}</div>
+                <div className="profile-card__identity">
+                  <h4>{application.job?.title ?? 'Unknown job'}</h4>
+                  <p className="muted">{application.job?.company ?? 'IntelyHire'} · {application.job?.location ?? 'Remote'}</p>
+                </div>
+                <span className={`status ${application.status}`}>{application.status}</span>
               </div>
-              <span className={`status ${application.status}`}>{application.status}</span>
+              <div className="profile-card__body">
+                <div className="profile-card__detail">
+                  <span>Summary</span>
+                  <strong>{application.coverLetter || 'No cover letter yet.'}</strong>
+                </div>
+                <div className="profile-card__detail">
+                  <span>Next step</span>
+                  <strong>{application.status === 'applied' ? 'Recruiter review' : 'Keep momentum going'}</strong>
+                </div>
+              </div>
+              <div className="profile-card__footer">
+                <div className="pill-row">
+                  <span>{application.job?.employmentType ?? 'Full-time'}</span>
+                  <span>{application.job?.location ?? 'Remote'}</span>
+                </div>
+              </div>
             </article>
           ))}
         </div>
@@ -628,7 +664,7 @@ function RecruiterWorkspace({
 }: {
   jobs: Job[];
   applications: Application[];
-  onCreateJob: (value: { title: string; company: string; location: string; employmentType: string; description: string; skills: string[] }) => void;
+  onCreateJob: (value: { title: string; company: string; location: string; employmentType: string; description: string; skills: string[]; qualifications: string[]; merits: string[] }) => void;
   onToggleJob: (jobId: string, status: 'open' | 'closed') => void;
   onUpdateApplication: (applicationId: string, status: Application['status']) => void;
   pending: boolean;
@@ -639,7 +675,9 @@ function RecruiterWorkspace({
     location: 'Remote',
     employmentType: 'Full-time',
     description: 'Design the recruitment UI, portals, and workflow views.',
-    skills: 'React, TypeScript, Product Thinking'
+    skills: 'React, TypeScript, Product Thinking',
+    qualifications: '3+ years building product interfaces, Experience with React',
+    merits: 'Strong product thinking, Cross-functional collaboration'
   });
 
   return (
@@ -650,7 +688,7 @@ function RecruiterWorkspace({
             <p className="eyebrow">Job management</p>
             <h3>Create and control open roles.</h3>
           </div>
-          <button className="secondary-button" disabled={pending} onClick={() => onCreateJob({ ...jobDraft, skills: splitList(jobDraft.skills) })} type="button">
+          <button className="secondary-button" disabled={pending} onClick={() => onCreateJob({ ...jobDraft, skills: splitList(jobDraft.skills), qualifications: splitList(jobDraft.qualifications), merits: splitList(jobDraft.merits) })} type="button">
             Publish job
           </button>
         </div>
@@ -660,6 +698,8 @@ function RecruiterWorkspace({
           <Field label="Location" value={jobDraft.location} onChange={(value) => setJobDraft((current) => ({ ...current, location: value }))} />
           <Field label="Employment type" value={jobDraft.employmentType} onChange={(value) => setJobDraft((current) => ({ ...current, employmentType: value }))} />
           <Field label="Skills" value={jobDraft.skills} onChange={(value) => setJobDraft((current) => ({ ...current, skills: value }))} />
+          <Field label="Qualifications" value={jobDraft.qualifications} onChange={(value) => setJobDraft((current) => ({ ...current, qualifications: value }))} />
+          <Field label="Merits" value={jobDraft.merits} onChange={(value) => setJobDraft((current) => ({ ...current, merits: value }))} />
         </div>
         <label>
           Description
@@ -688,6 +728,22 @@ function RecruiterWorkspace({
                     <span key={skill}>{skill}</span>
                   ))}
                 </div>
+                {job.qualifications?.length ? (
+                  <div className="pill-row">
+                    <strong>Qualifications:</strong>
+                    {job.qualifications.map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                ) : null}
+                {job.merits?.length ? (
+                  <div className="pill-row">
+                    <strong>Merits:</strong>
+                    {job.merits.map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <div className="inline-actions">
                 <span className={job.status === 'open' ? 'status open' : 'status closed'}>{job.status}</span>
@@ -709,16 +765,31 @@ function RecruiterWorkspace({
         </div>
         <div className="stack">
           {applications.map((application) => (
-            <article className="list-card" key={application.id}>
-              <div>
-                <h4>{application.job?.title ?? 'Unknown job'}</h4>
-                <p className="muted">
-                  {application.candidate?.fullName ?? 'Candidate'} · {application.candidate?.email ?? 'n/a'}
-                </p>
-                <p>{application.coverLetter || 'No cover letter provided.'}</p>
-              </div>
-              <div className="inline-actions">
+            <article className="profile-card profile-card--recruiter" key={application.id}>
+              <div className="profile-card__header">
+                <div className="profile-card__avatar">{getInitials(application.candidate?.fullName ?? 'Candidate')}</div>
+                <div className="profile-card__identity">
+                  <h4>{application.candidate?.fullName ?? 'Candidate'}</h4>
+                  <p className="muted">{application.candidate?.email ?? 'n/a'}</p>
+                  <p className="profile-card__role">{application.job?.title ?? 'Unknown job'}</p>
+                </div>
                 <span className={`status ${application.status}`}>{application.status}</span>
+              </div>
+              <div className="profile-card__body">
+                <div className="profile-card__detail">
+                  <span>Role</span>
+                  <strong>{application.job?.title ?? 'Unknown role'}</strong>
+                </div>
+                <div className="profile-card__detail">
+                  <span>Message</span>
+                  <strong>{application.coverLetter || 'No cover letter provided.'}</strong>
+                </div>
+              </div>
+              <div className="profile-card__footer">
+                <div className="pill-row">
+                  <span>{application.job?.company ?? 'IntelyHire'}</span>
+                  <span>{application.job?.location ?? 'Remote'}</span>
+                </div>
                 <select
                   value={application.status}
                   onChange={(event) => onUpdateApplication(application.id, event.target.value as Application['status'])}
