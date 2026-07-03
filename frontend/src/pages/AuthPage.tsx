@@ -1,21 +1,37 @@
 import { useState } from 'react';
 
+import type { SubscriptionPlan } from '../types';
 
 type AuthRole = 'candidate' | 'recruiter' | 'admin' | 'founder';
 type AuthMode = 'login' | 'register';
+type AuthPlan = SubscriptionPlan;
+
+const planOptions: Array<{ value: AuthPlan; label: string; detail: string }> = [
+  { value: 'student', label: 'Student', detail: 'Free · ideal for learners' },
+  { value: 'standard', label: 'Standard', detail: 'KES 1,500/month · 30 automated applications' },
+  { value: 'active', label: 'Active', detail: 'KES 3,000/month · 60 applications with 30 approvals + 30 automation' },
+  { value: 'professional', label: 'Professional', detail: 'KES 15,000/month · CV, GitHub, LinkedIn, and resume support' }
+];
 
 export function AuthPage({
   loading,
   error,
   initialRole = 'candidate',
   initialMode = 'login',
-  onAuthSuccess
+  onSubmit
 }: {
   loading: boolean;
   error: string | null;
   initialRole?: AuthRole;
   initialMode?: AuthMode;
-  onAuthSuccess?: () => void;
+  onSubmit: (payload: {
+    mode: AuthMode;
+    fullName: string;
+    email: string;
+    password: string;
+    role: AuthRole;
+    plan?: AuthPlan;
+  }) => void;
 }) {
 
   const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
@@ -25,6 +41,7 @@ export function AuthPage({
   const [email, setEmail] = useState('recruiter@intelyhire.dev');
   const [password, setPassword] = useState('Passw0rd!');
   const [selectedRole, setSelectedRole] = useState<AuthRole>(authRole);
+  const [selectedPlan, setSelectedPlan] = useState<AuthPlan>('student');
 
   // Auth submission is performed by App (it owns the mutations + token persistence).
 
@@ -37,13 +54,11 @@ export function AuthPage({
         mode={authMode}
         onModeChange={setAuthMode}
         onRoleChange={setAuthRole}
-        onSubmit={() => {
-          // Submission is handled in App via passed mutation callbacks.
-        }}
+        onSubmit={(payload) => onSubmit(payload)}
         loading={loading}
         error={error}
-        fields={{ fullName, email, password, selectedRole }}
-        setFields={{ setFullName, setEmail, setPassword, setSelectedRole }}
+        fields={{ fullName, email, password, selectedRole, selectedPlan }}
+        setFields={{ setFullName, setEmail, setPassword, setSelectedRole, setSelectedPlan }}
       />
     </div>
   );
@@ -85,19 +100,21 @@ function AuthCard({
     email: string;
     password: string;
     role: AuthRole;
+    plan?: AuthPlan;
   }) => void;
   loading: boolean;
   error: string | null;
-  fields: { fullName: string; email: string; password: string; selectedRole: AuthRole };
+  fields: { fullName: string; email: string; password: string; selectedRole: AuthRole; selectedPlan: AuthPlan };
   setFields: {
     setFullName: (v: string) => void;
     setEmail: (v: string) => void;
     setPassword: (v: string) => void;
     setSelectedRole: (v: AuthRole) => void;
+    setSelectedPlan: (v: AuthPlan) => void;
   };
 }) {
-  const { fullName, email, password, selectedRole } = fields;
-  const { setFullName, setEmail, setPassword, setSelectedRole } = setFields;
+  const { fullName, email, password, selectedRole, selectedPlan } = fields;
+  const { setFullName, setEmail, setPassword, setSelectedRole, setSelectedPlan } = setFields;
 
   return (
     <section className="auth-card">
@@ -114,7 +131,7 @@ function AuthCard({
         className="auth-form"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit({ mode, fullName, email, password, role: selectedRole });
+          onSubmit({ mode, fullName, email, password, role: selectedRole, plan: selectedRole === 'candidate' ? selectedPlan : undefined });
         }}
       >
         {mode === 'register' ? (
@@ -135,22 +152,43 @@ function AuthCard({
         </label>
 
         {mode === 'register' ? (
-          <label>
-            Role
-            <select
-              value={selectedRole}
-              onChange={(event) => {
-                const next = event.target.value as AuthRole;
-                onRoleChange(next);
-                setSelectedRole(next);
-              }}
-            >
-              <option value="candidate">Candidate</option>
-              <option value="recruiter">Recruiter</option>
-              <option value="admin">Admin</option>
-              <option value="founder">Founder</option>
-            </select>
-          </label>
+          <>
+            <label>
+              Role
+              <select
+                value={selectedRole}
+                onChange={(event) => {
+                  const next = event.target.value as AuthRole;
+                  onRoleChange(next);
+                  setSelectedRole(next);
+                }}
+              >
+                <option value="candidate">Candidate</option>
+                <option value="recruiter">Recruiter</option>
+                <option value="admin">Admin</option>
+                <option value="founder">Founder</option>
+              </select>
+            </label>
+
+            {selectedRole === 'candidate' ? (
+              <label>
+                Plan
+                <select
+                  value={selectedPlan}
+                  onChange={(event) => setSelectedPlan(event.target.value as AuthPlan)}
+                >
+                  {planOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="microcopy">
+                  {planOptions.find((option) => option.value === selectedPlan)?.detail}
+                </span>
+              </label>
+            ) : null}
+          </>
         ) : null}
 
         {error ? <div className="error-banner">{error}</div> : null}

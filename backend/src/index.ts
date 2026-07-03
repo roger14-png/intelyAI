@@ -18,9 +18,19 @@ registerAgentApi(app);
 
 const port = Number(process.env.PORT ?? 4000);
 
-
-
 const jwtSecret = process.env.JWT_SECRET ?? 'intelyhire-dev-secret';
+const googleClientId = process.env.GOOGLE_CLIENT_ID ?? '';
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET ?? '';
+const googleOAuthRedirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI ?? '';
+const encryptionKey = process.env.ENCRYPTION_KEY ?? '';
+const googleOAuthScopes = [
+  'openid',
+  'email',
+  'profile',
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send'
+].join(' ');
+
 const upload = multer({ dest: uploadsDir });
 
 app.use(cors({ origin: true, credentials: true }));
@@ -31,7 +41,8 @@ const authSchema = z.object({
   fullName: z.string().min(2).optional(),
   email: z.string().email(),
   password: z.string().min(6),
-  role: z.enum(['candidate', 'recruiter']).optional()
+  role: z.enum(['candidate', 'recruiter', 'admin', 'founder']).optional(),
+  plan: z.enum(['student', 'standard', 'active', 'professional']).optional()
 });
 
 const jobSchema = z.object({
@@ -40,7 +51,9 @@ const jobSchema = z.object({
   location: z.string().min(2),
   employmentType: z.string().min(2),
   description: z.string().min(10),
-  skills: z.array(z.string().min(1)).default([])
+  skills: z.array(z.string().min(1)).default([]),
+  qualifications: z.array(z.string().min(1)).default([]),
+  merits: z.array(z.string().min(1)).default([])
 });
 
 const profileSchema = z.object({
@@ -70,12 +83,13 @@ function getToken(authHeader?: string): string | null {
   return authHeader.slice('Bearer '.length);
 }
 
-function toPublicUser(user: { id: string; email: string; role: Role; fullName: string; verified: boolean }) {
+function toPublicUser(user: { id: string; email: string; role: Role; fullName: string; subscriptionPlan?: string; verified: boolean }) {
   return {
     id: user.id,
     email: user.email,
     role: user.role,
     fullName: user.fullName,
+    subscriptionPlan: user.subscriptionPlan,
     verified: user.verified
   };
 }
@@ -121,6 +135,166 @@ function queueEmailNotification(state: Awaited<ReturnType<typeof loadState>>, en
   }));
 }
 
+const googleOauthStateStore = new Map<string, { userId: string; createdAt: number }>();
+
+function requireGoogleConfig() {
+  if (!googleClientId || !googleClientSecret || !googleOAuthRedirectUri) {
+    throw new Error('Google OAuth configuration is required: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT_URI');
+  }
+  if (!encryptionKey) {
+    throw new Error('ENCRYPTION_KEY is required to encrypt Gmail tokens at rest');
+  }
+}
+
+function getEncryptionKey() {
+  return crypto.createHash('sha256').update(encryptionKey, 'utf8').digest();
+}
+
+function encryptToken(token: string): string {
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString('base64')}.${ciphertext.toString('base64')}.${tag.toString('base64')}`;
+}
+
+function decryptToken(encrypted: string | null | undefined): string | null {
+  if (!encrypted) return null;
+  const parts = encrypted.split('.');
+  if (parts.length !== 3) {
+    return encrypted;
+  }
+
+  const key = getEncryptionKey();
+  const iv = Buffer.from(parts[0], 'base64');
+  const ciphertext = Buffer.from(parts[1], 'base64');
+  const tag = Buffer.from(parts[2], 'base64');
+
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return decrypted.toString('utf8');
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlDecode(value: string): string {
+  let normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  while (normalized.length % 4 !== 0) normalized += '=';
+  return Buffer.from(normalized, 'base64').toString('utf8');
+}
+
+function getGoogleAccountForUser(state: Awaited<ReturnType<typeof loadState>>, userId: string) {
+  const account = state.emailAccounts.find((entry) => entry.userId === userId && entry.provider === 'google');
+  if (!account) return null;
+  return {
+    ...account,
+    accessToken: decryptToken(account.accessToken) ?? null,
+    refreshToken: decryptToken(account.refreshToken) ?? null
+  };
+}
+
+function buildMimeMessage(message: { from: string; to: string; cc?: string[]; bcc?: string[]; subject: string; body: string }) {
+  const headers = [
+    `From: ${message.from}`,
+    `To: ${message.to}`,
+    message.cc?.length ? `Cc: ${message.cc.join(', ')}` : '',
+    message.bcc?.length ? `Bcc: ${message.bcc.join(', ')}` : '',
+    `Subject: ${message.subject}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 7bit',
+    '',
+    message.body
+  ].filter(Boolean);
+
+  return headers.join('\r\n');
+}
+
+async function refreshGoogleAccessToken(state: Awaited<ReturnType<typeof loadState>>, account: EmailAccount) {
+  const refreshToken = decryptToken(account.refreshToken);
+  if (!refreshToken) {
+    throw new Error('No refresh token available for Gmail account');
+  }
+
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: googleClientId,
+      client_secret: googleClientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken
+    })
+  });
+
+  const tokenData = await tokenResponse.json();
+  if (!tokenResponse.ok || !tokenData.access_token) {
+    throw new Error('Unable to refresh Gmail access token');
+  }
+
+  const updatedAccount: EmailAccount = {
+    ...account,
+    accessToken: encryptToken(tokenData.access_token),
+    refreshToken: tokenData.refresh_token ? encryptToken(tokenData.refresh_token) : account.refreshToken,
+    updatedAt: new Date().toISOString()
+  };
+
+  const accountIndex = state.emailAccounts.findIndex((entry) => entry.id === account.id);
+  if (accountIndex >= 0) {
+    state.emailAccounts[accountIndex] = updatedAccount;
+    await saveState(state);
+  }
+
+  return updatedAccount;
+}
+
+async function callGmailApi(current: RequestUser, method: 'GET' | 'POST', url: string, options: { body?: unknown; retry?: boolean; state?: Awaited<ReturnType<typeof loadState>> } = {}) {
+  requireGoogleConfig();
+  const state = options.state ?? (await loadState());
+  const googleAccount = getGoogleAccountForUser(state, current.id);
+  if (!googleAccount || !googleAccount.accessToken || !googleAccount.refreshToken) {
+    throw new Error('No connected Gmail account found for current user');
+  }
+
+  async function doFetch(accessToken: string) {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${accessToken}`
+    };
+    let body: string | undefined;
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
+
+    return fetch(url, { method, headers, body });
+  }
+
+  let response = await doFetch(googleAccount.accessToken);
+  if (response.status === 401 && !options.retry) {
+    const refreshed = await refreshGoogleAccessToken(state, googleAccount);
+    response = await doFetch(refreshed.accessToken ?? '');
+  }
+
+  return response;
+}
+
+function extractMessageBody(payload: any): string | null {
+  if (!payload) return null;
+  if (payload.body?.size && payload.body.data) {
+    return base64UrlDecode(payload.body.data);
+  }
+  if (Array.isArray(payload.parts)) {
+    for (const part of payload.parts) {
+      const result = extractMessageBody(part);
+      if (result) return result;
+    }
+  }
+  return null;
+}
+
 async function authUser(req: express.Request): Promise<RequestUser | null> {
   const token = getToken(req.header('authorization'));
   if (!token) return null;
@@ -154,6 +328,7 @@ app.post('/auth/register', async (req, res) => {
     email: parsed.data.email.toLowerCase(),
     passwordHash: await bcrypt.hash(parsed.data.password, 10),
     role: parsed.data.role ?? 'candidate',
+    subscriptionPlan: parsed.data.plan ?? 'student',
     verified: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -163,7 +338,7 @@ app.post('/auth/register', async (req, res) => {
   state.candidateProfiles.push(createEmptyCandidateProfile(user.id));
   await saveState(state);
 
-  const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName });
+  const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName, subscriptionPlan: user.subscriptionPlan });
   return res.status(201).json({ token, user: toPublicUser(user) });
 });
 
@@ -184,7 +359,7 @@ app.post('/auth/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName });
+  const token = signToken({ id: user.id, email: user.email, role: user.role, fullName: user.fullName, subscriptionPlan: user.subscriptionPlan });
   return res.json({ token, user: toPublicUser(user) });
 });
 
@@ -383,6 +558,216 @@ app.post('/email/accounts/:accountId/test', async (req, res) => {
   return res.status(201).json({ ok: true });
 });
 
+app.get('/email/google/auth/start', async (req, res) => {
+  const current = await authUser(req);
+  if (!current) return res.status(401).json({ error: 'Unauthorized' });
+
+  requireGoogleConfig();
+  const stateValue = crypto.randomUUID();
+  googleOauthStateStore.set(stateValue, { userId: current.id, createdAt: Date.now() });
+
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authUrl.searchParams.set('client_id', googleClientId);
+  authUrl.searchParams.set('redirect_uri', googleOAuthRedirectUri);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('scope', googleOAuthScopes);
+  authUrl.searchParams.set('access_type', 'offline');
+  authUrl.searchParams.set('prompt', 'consent');
+  authUrl.searchParams.set('include_granted_scopes', 'true');
+  authUrl.searchParams.set('state', stateValue);
+
+  return res.json({ url: authUrl.toString() });
+});
+
+app.get('/email/google/auth/callback', async (req, res) => {
+  const code = String(req.query.code ?? '');
+  const stateValue = String(req.query.state ?? '');
+  if (!code || !stateValue) {
+    return res.status(400).send('Missing code or state');
+  }
+
+  const stored = googleOauthStateStore.get(stateValue);
+  if (!stored || Date.now() - stored.createdAt > 1000 * 60 * 10) {
+    return res.status(400).send('Invalid or expired OAuth state');
+  }
+  googleOauthStateStore.delete(stateValue);
+
+  requireGoogleConfig();
+
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: googleClientId,
+      client_secret: googleClientSecret,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: googleOAuthRedirectUri
+    })
+  });
+
+  const tokenData = await tokenResponse.json();
+  if (!tokenResponse.ok || !tokenData.access_token) {
+    return res.status(500).send('Unable to exchange Google authorization code');
+  }
+
+  const accessToken = tokenData.access_token;
+  const refreshToken = tokenData.refresh_token;
+  if (!refreshToken) {
+    return res.status(500).send('Google did not return a refresh token; ensure prompt=consent and offline access');
+  }
+
+  const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+
+  const profileData = await profileResponse.json();
+  if (!profileResponse.ok || !profileData.emailAddress) {
+    return res.status(500).send('Unable to determine Gmail address from Google response');
+  }
+
+  const state = await loadState();
+  const now = new Date().toISOString();
+  const existingIndex = state.emailAccounts.findIndex(
+    (account) => account.userId === stored.userId && account.provider === 'google' && account.emailAddress.toLowerCase() === profileData.emailAddress.toLowerCase()
+  );
+
+  const account: EmailAccount = {
+    id: existingIndex >= 0 ? state.emailAccounts[existingIndex].id : crypto.randomUUID(),
+    userId: stored.userId,
+    provider: 'google',
+    emailAddress: profileData.emailAddress.toLowerCase(),
+    accessToken: encryptToken(accessToken),
+    refreshToken: encryptToken(refreshToken),
+    createdAt: existingIndex >= 0 ? state.emailAccounts[existingIndex].createdAt : now,
+    updatedAt: now
+  };
+
+  if (existingIndex >= 0) {
+    state.emailAccounts[existingIndex] = account;
+  } else {
+    state.emailAccounts.unshift(account);
+  }
+
+  await saveState(state);
+  res.send('<html><body><h1>Gmail connected</h1><p>You may close this window.</p></body></html>');
+});
+
+app.get('/gmail/messages', async (req, res) => {
+  const current = await authUser(req);
+  if (!current) return res.status(401).json({ error: 'Unauthorized' });
+
+  const query = String(req.query.query ?? 'in:anywhere');
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)));
+
+  try {
+    const state = await loadState();
+    const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${limit}`;
+    const listResponse = await callGmailApi(current, 'GET', listUrl, { state });
+    const listData = await listResponse.json();
+    if (!listResponse.ok) {
+      return res.status(listResponse.status).json({ error: listData.error ?? 'Gmail list request failed' });
+    }
+
+    const messages = await Promise.all(
+      (listData.messages ?? []).map(async (item: any) => {
+        const messageResponse = await callGmailApi(current, 'GET', `https://gmail.googleapis.com/gmail/v1/users/me/messages/${item.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, { state });
+        const messageData = await messageResponse.json();
+        if (!messageResponse.ok) {
+          return { id: item.id, error: messageData.error ?? 'Unable to load message metadata' };
+        }
+        const headers = Object.fromEntries((messageData.payload?.headers ?? []).map((header: any) => [header.name, header.value]));
+        return {
+          id: messageData.id,
+          threadId: messageData.threadId,
+          snippet: messageData.snippet,
+          headers
+        };
+      })
+    );
+
+    return res.json({ messages });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? 'Unexpected Gmail error' });
+  }
+});
+
+app.get('/gmail/message/:id', async (req, res) => {
+  const current = await authUser(req);
+  if (!current) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const state = await loadState();
+    const messageResponse = await callGmailApi(current, 'GET', `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(req.params.id)}?format=full`, { state });
+    const messageData = await messageResponse.json();
+    if (!messageResponse.ok) {
+      return res.status(messageResponse.status).json({ error: messageData.error ?? 'Unable to load Gmail message' });
+    }
+
+    const headers = Object.fromEntries((messageData.payload?.headers ?? []).map((header: any) => [header.name, header.value]));
+    const body = extractMessageBody(messageData.payload) ?? '';
+
+    return res.json({
+      id: messageData.id,
+      threadId: messageData.threadId,
+      snippet: messageData.snippet,
+      headers,
+      body
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? 'Unexpected Gmail error' });
+  }
+});
+
+app.post('/gmail/send', async (req, res) => {
+  const current = await authUser(req);
+  if (!current) return res.status(401).json({ error: 'Unauthorized' });
+
+  const sendSchema = z.object({
+    to: z.string().email(),
+    cc: z.array(z.string().email()).optional(),
+    bcc: z.array(z.string().email()).optional(),
+    subject: z.string().min(1),
+    body: z.string().min(1)
+  });
+  const parsed = sendSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  try {
+    const state = await loadState();
+    const googleAccount = getGoogleAccountForUser(state, current.id);
+    if (!googleAccount || !googleAccount.emailAddress) {
+      return res.status(400).json({ error: 'No connected Gmail account found' });
+    }
+
+    const message = buildMimeMessage({
+      from: googleAccount.emailAddress,
+      to: parsed.data.to,
+      cc: parsed.data.cc,
+      bcc: parsed.data.bcc,
+      subject: parsed.data.subject,
+      body: parsed.data.body
+    });
+
+    const raw = base64UrlEncode(message);
+    const sendResponse = await callGmailApi(current, 'POST', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      body: { raw },
+      state
+    });
+    const sendData = await sendResponse.json();
+
+    if (!sendResponse.ok) {
+      return res.status(sendResponse.status).json({ error: sendData.error ?? 'Gmail send request failed' });
+    }
+
+    return res.json({ message: 'Email sent', result: sendData });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? 'Unexpected Gmail send error' });
+  }
+});
+
 app.get('/jobs', async (req, res) => {
   const current = await authUser(req);
   if (!current) {
@@ -416,6 +801,8 @@ app.post('/jobs', async (req, res) => {
   const job: Job = {
     id: crypto.randomUUID(),
     ...parsed.data,
+    qualifications: parsed.data.qualifications ?? [],
+    merits: parsed.data.merits ?? [],
     status: 'open',
     createdBy: current.id,
     createdAt: new Date().toISOString(),
@@ -592,13 +979,27 @@ app.post('/ai/match', async (req, res) => {
     return res.status(404).json({ error: 'Matching inputs not found' });
   }
 
-  const profileText = `${profile.headline} ${profile.summary} ${profile.skills.join(' ')}`.toLowerCase();
-  const jobText = `${job.title} ${job.description} ${job.company} ${job.skills.join(' ')}`.toLowerCase();
+  const normalizeChunk = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const hasRequirementMatch = (text: string, requirement: string) => {
+    const normalizedRequirement = normalizeChunk(requirement);
+    if (!normalizedRequirement) return false;
+    const normalizedText = normalizeChunk(text);
+    return normalizedText.includes(normalizedRequirement);
+  };
+
+  const profileText = `${profile.headline} ${profile.summary} ${profile.skills.join(' ')} ${profile.experience.map((entry) => `${entry.title} ${entry.description}`).join(' ')}`.toLowerCase();
+  const jobText = `${job.title} ${job.description} ${job.company} ${job.skills.join(' ')} ${(job.qualifications ?? []).join(' ')} ${(job.merits ?? []).join(' ')}`.toLowerCase();
 
   const skills = new Set(profile.skills.map((skill) => skill.toLowerCase()));
   const requiredSkills = job.skills.map((skill) => skill.toLowerCase());
   const matchingSkills = requiredSkills.filter((skill) => skills.has(skill));
   const missingSkills = requiredSkills.filter((skill) => !skills.has(skill));
+  const qualifications = (job.qualifications ?? []).map((item) => item.trim()).filter(Boolean);
+  const merits = (job.merits ?? []).map((item) => item.trim()).filter(Boolean);
+  const matchedQualifications = qualifications.filter((item) => hasRequirementMatch(profileText, item));
+  const matchedMerits = merits.filter((item) => hasRequirementMatch(profileText, item));
+  const missingQualifications = qualifications.filter((item) => !matchedQualifications.includes(item));
+  const missingMerits = merits.filter((item) => !matchedMerits.includes(item));
 
   // Heuristic: keyword overlap between job and candidate profile (headline/summary/skills)
   const jobKeywords = Array.from(new Set(jobText.split(/[^a-z0-9+.-]+/g).filter((t) => t.length >= 3)));
@@ -607,17 +1008,27 @@ app.post('/ai/match', async (req, res) => {
   const locationHit = profile.location.trim() && job.location.trim() ? profile.location.trim().toLowerCase() === job.location.trim().toLowerCase() : false;
 
   const skillComponent = requiredSkills.length === 0 ? 0 : matchingSkills.length / requiredSkills.length;
+  const qualificationComponent = qualifications.length === 0 ? 0 : matchedQualifications.length / qualifications.length;
+  const meritComponent = merits.length === 0 ? 0 : matchedMerits.length / merits.length;
   const keywordComponent = jobKeywords.length === 0 ? 0 : keywordHits.length / jobKeywords.length;
 
-  const scoreRaw = 100 * (0.65 * skillComponent + 0.30 * keywordComponent + 0.05 * (locationHit ? 1 : 0));
+  const scoreRaw = 100 * (0.50 * skillComponent + 0.20 * qualificationComponent + 0.15 * meritComponent + 0.10 * keywordComponent + 0.05 * (locationHit ? 1 : 0));
   const score = Math.max(0, Math.min(100, Math.round(scoreRaw)));
 
   const reasons: string[] = [];
   if (requiredSkills.length > 0) {
     reasons.push(`${matchingSkills.length}/${requiredSkills.length} skills match`);
-    if (missingSkills.length > 0) reasons.push(`Missing: ${missingSkills.slice(0, 5).join(', ')}`);
+    if (missingSkills.length > 0) reasons.push(`Missing skills: ${missingSkills.slice(0, 5).join(', ')}`);
   } else {
     reasons.push('No required skills listed for this job');
+  }
+  if (qualifications.length > 0) {
+    reasons.push(`${matchedQualifications.length}/${qualifications.length} qualifications match`);
+    if (missingQualifications.length > 0) reasons.push(`Missing qualifications: ${missingQualifications.slice(0, 3).join(', ')}`);
+  }
+  if (merits.length > 0) {
+    reasons.push(`${matchedMerits.length}/${merits.length} merits align`);
+    if (missingMerits.length > 0) reasons.push(`Missing merits: ${missingMerits.slice(0, 3).join(', ')}`);
   }
   reasons.push(`${keywordHits.length} keyword hits from profile`);
   if (locationHit) reasons.push('Location matches');

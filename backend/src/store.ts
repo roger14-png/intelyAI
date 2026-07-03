@@ -45,6 +45,8 @@ async function createDefaultState(): Promise<DbState> {
         employmentType: 'Full-time',
         description: 'Build the candidate portal, recruiter workflow, and hiring dashboard.',
         skills: ['TypeScript', 'React', 'Node.js'],
+        qualifications: ['3+ years in modern web products', 'Experience with TypeScript'],
+        merits: ['Strong product thinking', 'Cross-functional collaboration'],
         status: 'open',
         createdBy: 'system',
         createdAt: now(),

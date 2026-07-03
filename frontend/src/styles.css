@@ -335,6 +335,99 @@ select:focus {
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.14);
   background: rgba(15, 23, 42, 0.6);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.list-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 12px 30px rgba(2, 8, 23, 0.24);
+}
+
+.profile-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(135deg, rgba(10, 24, 43, 0.96), rgba(17, 31, 54, 0.92));
+  box-shadow: 0 20px 40px rgba(2, 8, 23, 0.18);
+}
+
+.profile-card--recruiter {
+  background: linear-gradient(135deg, rgba(11, 29, 50, 0.97), rgba(20, 35, 60, 0.92));
+}
+
+.profile-card__header,
+.profile-card__footer,
+.profile-card__body {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-card__body {
+  align-items: flex-start;
+  padding-top: 4px;
+}
+
+.profile-card__header {
+  align-items: flex-start;
+}
+
+.profile-card__footer {
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.profile-card__avatar {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #38bdf8, #86efac);
+  color: #07111f;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.profile-card__identity {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+
+.profile-card__identity h4,
+.profile-card__detail strong {
+  margin: 0;
+}
+
+.profile-card__role {
+  margin: 0;
+  color: #7dd3fc;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.profile-card__detail {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-card__detail span {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.profile-card__detail strong {
+  font-size: 0.95rem;
+  color: #f8fbff;
 }
 
 .status {
