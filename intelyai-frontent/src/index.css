@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* 1. ENABLE CLASS-BASED DARK MODE FOR TAILWIND V4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 2. TAILWIND V4 THEME VARIABLES */
+@theme {
+  --color-brand-blue: #0066FF;
+  --color-brand-blueHover: #0052CC;
+  --color-brand-cyan: #00C2FF;
+  --color-brand-green: #00D25B;
+  --color-brand-greenHover: #00B34D;
+  --color-brand-emerald: #10B981;
+
+  --color-dark-bg: #0B0F19;
+  --color-dark-surface: #141C2E;
+  --color-dark-border: #22304A;
+  --color-dark-hover: #1E2B45;
+  --color-dark-text: #F1F5F9;
+  --color-dark-muted: #94A3B8;
+
+  --color-bright-bg: #F8FAFC;
+  --color-bright-surface: #FFFFFF;
+  --color-bright-border: #E2E8F0;
+  --color-bright-hover: #F1F5F9;
+  --color-bright-text: #0F172A;
+  --color-bright-muted: #64748B;
+
+  --shadow-brand-glow: 0 0 20px -3px rgba(0, 102, 255, 0.35);
+  --shadow-green-glow: 0 0 20px -3px rgba(0, 210, 91, 0.35);
+}
+
+/* 3. BASE BODY DARK / LIGHT STYLING */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark, html.dark body {
+  background-color: #0B0F19;
+  color: #F1F5F9;
+}
+
+html:not(.dark), html:not(.dark) body {
+  background-color: #F8FAFC;
+  color: #0F172A;
+}
+
+/* 4. CUSTOM CSS GRADIENTS */
+.text-gradient-brand {
+  background: linear-gradient(135deg, #0066FF 0%, #00D25B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-blue {
+  background: linear-gradient(135deg, #0066FF 0%, #00C2FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-green {
+  background: linear-gradient(135deg, #00D25B 0%, #10B981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-blue-green-glow {
+  background-image: radial-gradient(circle at top right, rgba(0, 210, 91, 0.12), rgba(0, 102, 255, 0.12));
+}
