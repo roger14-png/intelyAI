@@ -1,40 +1,21 @@
-# IntelyHire
+# intelyAI - PoC job scraper
 
-Monorepo MVP for a startup-scale recruitment platform.
+This repository contains a proof-of-concept Python scraper (scraper.py) that demonstrates a focused, seed-driven approach to discovering job postings and extracting skill keywords. It is intentionally minimal and must be adapted per target site.
 
-## What is included
+Usage
 
-- Auth with roles: candidate, recruiter, admin, founder
-- Candidate profile management
-- Job management for recruiters
-- Application workflow with status updates
-- Dashboard summary endpoints
-- A polished React + Vite frontend
-- A lightweight Express API with local JSON persistence for fast MVP iteration
+1. Create a virtual environment and install requirements:
 
-## Run locally
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Start the app:
-   ```bash
-   npm run dev
-   ```
+2. Run the PoC:
 
-API defaults to `http://localhost:4000` and the web app to `http://localhost:5173`.
+    python3 scraper.py
 
-## Demo accounts
+Important notes
 
-These accounts are seeded on first run:
-
-- recruiter@intelyhire.dev / Passw0rd!
-- admin@intelyhire.dev / Passw0rd!
-- founder@intelyhire.dev / Passw0rd!
-
-## Next phase
-
-- Replace JSON persistence with PostgreSQL + Prisma
-- Add email provider integrations
-- Introduce AI matching and application generation
+- Always check and respect each target site's robots.txt and Terms of Service before scraping.
+- Replace the CSS selectors in scraper.py with site-specific selectors for reliable results.
+- This PoC is not intended for high-scale scraping — use Scrapy and obey per-domain rate limits and politeness rules for production.
